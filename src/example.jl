@@ -542,7 +542,6 @@ function memory_and_threading_tests()
     
     # Test memory usage with different record sizes
     record_sizes = [100, 1000, 10000]
-    
     for size in record_sizes
         println("\n  📏 Testing memory with $size records:")
         
@@ -557,22 +556,24 @@ function memory_and_threading_tests()
             push!(test_data, row)
         end
         
-        # Measure memory before insertion
-        GC.gc()  # Force garbage collection
-        mem_before = Base.gc_live_bytes()
-        
-        # Insert data
+        # Insert data and measure memory directly
         db_insert!(db, :memory_test, test_data)
         
-        # Measure memory after insertion
-        GC.gc()
-        mem_after = Base.gc_live_bytes()
+        # Get all records to measure their memory footprint
+        all_records = db_select(db, :memory_test)
         
-        memory_used = mem_after - mem_before
-        memory_per_record = memory_used / size
+        # Calculate memory usage using Base.summarysize
+        total_memory = Base.summarysize(all_records)
+        memory_per_record = total_memory / size
         
-        println("    💾 Total memory: $(round(memory_used / 1024 / 1024, digits=2)) MB")
-        println("    📊 Per record: $(round(memory_per_record)) bytes")
+        # Also measure the table's internal storage
+        table = db.tables[:memory_test]
+        table_memory = Base.summarysize(table.columns) + Base.summarysize(table.indices)
+        
+        println("    💾 Result set memory: $(round(total_memory / 1024, digits=2)) KB")
+        println("    📊 Per record (results): $(round(memory_per_record)) bytes")
+        println("    🗄️ Table storage memory: $(round(table_memory / 1024, digits=2)) KB")
+        println("    📊 Per record (storage): $(round(table_memory / size)) bytes")
         
         # Clear table for next test
         db_delete!(db, :memory_test)
